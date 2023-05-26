@@ -142,7 +142,10 @@ class ARCRest:
             elif "delegation_id" not in result:
                 job.errors.append(NoValueInARCResult("No delegation ID in successful response"))
             else:
-                job.delegid = result["delegation_id"]
+                job.delegations = result["delegation_id"]
+                # /rest/1.0 compatibility
+                if not isinstance(job.delegations, list):
+                    job.delegations = [job.delegations]
 
     def downloadFile(self, url, path, blocksize=None):
         if blocksize is None:
@@ -738,8 +741,6 @@ class ARCRest_1_0(ARCRest):
         tosubmit = []  # sublist of jobs that will be submitted
         bulkdesc = ""
         for job in jobs:
-            job.delegid = delegationID
-
             # parse job description
             if not arc.JobDescription_Parse(job.descstr, jobdescs):
                 job.errors.append(DescriptionParseError("Failed to parse description"))
@@ -846,8 +847,6 @@ class ARCRest_1_1(ARCRest):
         tosubmit = []  # sublist of jobs that will be submitted
         bulkdesc = ""
         for job in jobs:
-            job.delegid = delegationID
-
             # parse job description
             if not arc.JobDescription_Parse(job.descstr, jobdescs):
                 job.errors.append(DescriptionParseError("Failed to parse description"))
@@ -944,11 +943,12 @@ class ARCJob:
         self.id = id
         self.descstr = descstr
         self.name = None
-        self.delegid = None
+        self.delegations = []
         self.state = None
         self.errors = []
         self.downloadFiles = []
         self.inputFiles = {}
+        self.restartState = None
 
         self.ExecutionNode = None
         self.UsedTotalWallTime = None
@@ -972,7 +972,6 @@ class ARCJob:
         self.EndTime = None
         self.WorkingAreaEraseTime = None
         self.ProxyExpirationTime = None
-        self.RestartState = []
         self.Error = []
 
     def updateFromInfo(self, infoDocument):
@@ -1080,8 +1079,14 @@ class ARCJob:
                 "%Y-%m-%dT%H:%M:%SZ"
             )
 
-        if "RestartState" in infoDict:
-            self.RestartState = infoDict["RestartState"]
+        restartStates = infoDict.get("RestartState", [])
+        # /rest/1.0 compatibility
+        if not isinstance(restartStates, list):
+            restartStates = [restartStates]
+        # parse out the arcrest restart state
+        for state in restartStates:
+            if state.startswith("arcrest:"):
+                self.restartState = state[len("arcrest:"):]
 
     def getArclibInputFiles(self, desc):
         self.inputFiles = {}
