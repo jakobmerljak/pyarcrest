@@ -950,7 +950,6 @@ class ARCJob:
         self.inputFiles = {}
         self.restartState = None
 
-        self.ExecutionNode = None
         self.UsedTotalWallTime = None
         self.UsedTotalCPUTime = None
         self.RequestedTotalWallTime = None
@@ -973,117 +972,116 @@ class ARCJob:
         self.WorkingAreaEraseTime = None
         self.ProxyExpirationTime = None
         self.Error = []
+        self.ExecutionNode = []
 
     def updateFromInfo(self, infoDocument):
         infoDict = infoDocument.get("ComputingActivity", {})
-        if not infoDict:
-            return
 
-        if "Name" in infoDict:
-            self.name = infoDict["Name"]
+        # handle string attributes
 
-        # get state from a list of activity states in different systems
-        for state in infoDict.get("State", []):
+        self.name = infoDict.get("Name", None)
+        self.Type = infoDict.get("Type", None)
+        self.LocalIDFromManager = infoDict.get("LocalIDFromManager", None)
+        self.Owner = infoDict.get("Owner", None)
+        self.LocalOwner = infoDict.get("LocalOwner", None)
+        self.StdIn = infoDict.get("StdIn", None)
+        self.StdOut = infoDict.get("StdOut", None)
+        self.StdErr = infoDict.get("StdErr", None)
+        self.LogDir = infoDict.get("LogDir", None)
+        self.Queue = infoDict.get("Queue", None)
+
+        # handle int attributes
+
+        self.UsedTotalWallTime = infoDict.get("UsedTotalWallTime", None)
+        if self.UsedTotalWallTime is not None:
+            self.UsedTotalWallTime = int(self.UsedTotalWallTime)
+
+        self.UsedTotalCPUTime = infoDict.get("UsedTotalCPUTime", None)
+        if self.UsedTotalCPUTime is not None:
+            self.UsedTotalCPUTime = int(self.UsedTotalCPUTime)
+
+        self.RequestedTotalWallTime = infoDict.get("RequestedTotalWallTime", None)
+        if self.RequestedTotalWallTime is not None:
+            self.RequestedTotalWallTime = int(self.RequestedTotalWallTime)
+
+        self.RequestedTotalCPUTime = infoDict.get("RequestedTotalCPUTime", None)
+        if self.RequestedTotalCPUTime is not None:
+            self.RequestedTotalCPUTime = int(self.RequestedTotalCPUTime)
+
+        self.RequestedSlots = infoDict.get("RequestedSlots", None)
+        if self.RequestedSlots is not None:
+            self.RequestedSlots = int(self.RequestedSlots)
+
+        self.ExitCode = infoDict.get("ExitCode", None)
+        if self.ExitCode is not None:
+            self.ExitCode = int(self.ExitCode)
+
+        self.WaitingPosition = infoDict.get("WaitingPosition", None)
+        if self.WaitingPosition is not None:
+            self.WaitingPosition = int(self.WaitingPosition)
+
+        self.UsedMainMemory = infoDict.get("UsedMainMemory", None)
+        if self.UsedMainMemory is not None:
+            self.UsedMainMemory = int(self.UsedMainMemory)
+
+        # handle datetime attributes
+
+        self.SubmissionTime = infoDict.get("SubmissionTime", None)
+        if self.SubmissionTime is not None:
+            self.SubmissionTime = datetime.datetime.strptime(
+                self.SubmissionTime,
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+        self.EndTime = infoDict.get("EndTime", None)
+        if self.EndTime is not None:
+            self.EndTime = datetime.datetime.strptime(
+                self.EndTime,
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+        self.WorkingAreaEraseTime = infoDict.get("WorkingAreaEraseTime", None)
+        if self.WorkingAreaEraseTime is not None:
+            self.WorkingAreaEraseTime = datetime.datetime.strptime(
+                self.WorkingAreaEraseTime,
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+        self.ProxyExpirationTime = infoDict.get("ProxyExpirationTime", None)
+        if self.ProxyExpirationTime is not None:
+            self.ProxyExpirationTime = datetime.datetime.strptime(
+                self.ProxyExpirationTime,
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+        # handle list attributes
+
+        self.Error = infoDict.get("Error", [])
+        # /rest/1.0 compatibility
+        if not isinstance(self.Error, list):
+            self.Error = [self.Error]
+
+        nodes = infoDict.get("ExecutionNode", [])
+        # /rest/1.0 compatibility
+        if not isinstance(nodes, list):
+            nodes = [nodes]
+        # throw out all non ASCII characters from nodes
+        self.ExecutionNode = [''.join(c for c in node if ord(c) < 128) for node in nodes]
+
+        # get state from a list of states in different systems
+        states = infoDict.get("State", [])
+        # /rest/1.0 compatibility
+        if not isinstance(states, list):
+            states = [states]
+        for state in states:
             if state.startswith("arcrest:"):
                 self.state = state[len("arcrest:"):]
 
-        if "Error" in infoDict:
-            # /rest/1.0 compatibility
-            if isinstance(infoDict["Error"], list):
-                self.Error = infoDict["Error"]
-            else:
-                self.Error = [infoDict["Error"]]
-
-        if "ExecutionNode" in infoDict:
-            # /rest/1.0 compatibility
-            if isinstance(infoDict["ExecutionNode"], list):
-                self.ExecutionNode = infoDict["ExecutionNode"]
-            else:
-                self.ExecutionNode = [infoDict["ExecutionNode"]]
-            # throw out all non ASCII characters from nodes
-            for i in range(len(self.ExecutionNode)):
-                self.ExecutionNode[i] = ''.join([i for i in self.ExecutionNode[i] if ord(i) < 128])
-
-        if "UsedTotalWallTime" in infoDict:
-            self.UsedTotalWallTime = int(infoDict["UsedTotalWallTime"])
-
-        if "UsedTotalCPUTime" in infoDict:
-            self.UsedTotalCPUTime = int(infoDict["UsedTotalCPUTime"])
-
-        if "RequestedTotalWallTime" in infoDict:
-            self.RequestedTotalWallTime = int(infoDict["RequestedTotalWallTime"])
-
-        if "RequestedTotalCPUTime" in infoDict:
-            self.RequestedTotalCPUTime = int(infoDict["RequestedTotalCPUTime"])
-
-        if "RequestedSlots" in infoDict:
-            self.RequestedSlots = int(infoDict["RequestedSlots"])
-
-        if "ExitCode" in infoDict:
-            self.ExitCode = int(infoDict["ExitCode"])
-
-        if "Type" in infoDict:
-            self.Type = infoDict["Type"]
-
-        if "LocalIDFromManager" in infoDict:
-            self.LocalIDFromManager = infoDict["LocalIDFromManager"]
-
-        if "WaitingPosition" in infoDict:
-            self.WaitingPosition = int(infoDict["WaitingPosition"])
-
-        if "Owner" in infoDict:
-            self.Owner = infoDict["Owner"]
-
-        if "LocalOwner" in infoDict:
-            self.LocalOwner = infoDict["LocalOwner"]
-
-        if "StdIn" in infoDict:
-            self.StdIn = infoDict["StdIn"]
-
-        if "StdOut" in infoDict:
-            self.StdOut = infoDict["StdOut"]
-
-        if "StdErr" in infoDict:
-            self.StdErr = infoDict["StdErr"]
-
-        if "LogDir" in infoDict:
-            self.LogDir = infoDict["LogDir"]
-
-        if "Queue" in infoDict:
-            self.Queue = infoDict["Queue"]
-
-        if "UsedMainMemory" in infoDict:
-            self.UsedMainMemory = int(infoDict["UsedMainMemory"])
-
-        if "SubmissionTime" in infoDict:
-            self.SubmissionTime = datetime.datetime.strptime(
-                infoDict["SubmissionTime"],
-                "%Y-%m-%dT%H:%M:%SZ"
-            )
-
-        if "EndTime" in infoDict:
-            self.EndTime = datetime.datetime.strptime(
-                infoDict["EndTime"],
-                "%Y-%m-%dT%H:%M:%SZ"
-            )
-
-        if "WorkingAreaEraseTime" in infoDict:
-            self.WorkingAreaEraseTime = datetime.datetime.strptime(
-                infoDict["WorkingAreaEraseTime"],
-                "%Y-%m-%dT%H:%M:%SZ"
-            )
-
-        if "ProxyExpirationTime" in infoDict:
-            self.ProxyExpirationTime = datetime.datetime.strptime(
-                infoDict["ProxyExpirationTime"],
-                "%Y-%m-%dT%H:%M:%SZ"
-            )
-
+        # get restart state from a list of restart states in different systems
         restartStates = infoDict.get("RestartState", [])
         # /rest/1.0 compatibility
         if not isinstance(restartStates, list):
             restartStates = [restartStates]
-        # parse out the arcrest restart state
         for state in restartStates:
             if state.startswith("arcrest:"):
                 self.restartState = state[len("arcrest:"):]
