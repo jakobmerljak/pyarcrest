@@ -139,16 +139,14 @@ def main():
         delegs_parser.print_help()
         return
 
-    kwargs = {}
     if args.verbose:
-        log = logging.getLogger()
+        log = logging.getLogger("pyarcrest")
         handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.DEBUG)
         handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
         log.addHandler(handler)
         log.setLevel(logging.DEBUG)
-        kwargs["log"] = logging.getLogger()
-    arcrest = ARCRest.getClient(url=args.cluster, proxypath=args.proxy, **kwargs)
+
+    arcrest = ARCRest.getClient(url=args.cluster, proxypath=args.proxy)
 
     if args.command == "jobs" and args.jobs == "list":
         print(json.dumps(arcrest.getJobsList(), indent=4))

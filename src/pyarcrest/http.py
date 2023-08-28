@@ -1,19 +1,31 @@
+import http.client
 import json
+import logging
 import ssl
 from http.client import HTTPConnection, HTTPSConnection, RemoteDisconnected
 from urllib.parse import urlencode, urlparse
 
-from pyarcrest.common import getNullLogger
 from pyarcrest.errors import HTTPClientError
+
+log = logging.getLogger(__name__)
+
+
+### Solution to output http.client logs to log instead of print
+
+# https://stackoverflow.com/a/58769712
+def print_to_log(*args):
+    log.debug(" ".join(args))
+
+http.client.print = print_to_log
+
+###
 
 
 # TODO: blocksize is not used until Python 3.7 becomes minimum version
 class HTTPClient:
 
-    def __init__(self, url=None, host=None, port=None, blocksize=None, timeout=None, proxypath=None, log=getNullLogger(), isHTTPS=True):
+    def __init__(self, url=None, host=None, port=None, blocksize=None, timeout=None, proxypath=None, isHTTPS=True):
         """Process parameters and create HTTP connection."""
-        self.log = log
-
         if url:
             parts = urlparse(url)
             if parts.scheme == "https" or parts.scheme == "":
@@ -57,6 +69,7 @@ class HTTPClient:
             if not port:
                 port = 80
             self.conn = HTTPConnection(host, port=port, **kwargs)
+        self.conn.set_debuglevel(1)
 
         self.isHTTPS = useHTTPS
 
@@ -85,7 +98,6 @@ class HTTPClient:
             url = endpoint
 
         try:
-            self.log.debug(f"{method} {url} headers={headers}")
             self.conn.request(method, url, body=body, headers=headers)
             resp = self.conn.getresponse()
         # TODO: should the request be retried for aborted connection by peer?
