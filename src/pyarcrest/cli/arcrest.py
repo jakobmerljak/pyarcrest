@@ -15,7 +15,7 @@ def main():
     parserCommon.add_argument("-P", "--proxy", type=str, default=PROXYPATH, help="path to proxy cert")
     parserCommon.add_argument("-v", "--verbose", action="store_true", help="print debug output")
 
-    parser = argparse.ArgumentParser("Execute ARC operations")
+    parser = argparse.ArgumentParser("Execute ARC operations", parents=[parserCommon])
     parser.add_argument("cluster", type=str, help="hostname (with optional port) of the cluster")
     subparsers = parser.add_subparsers(dest="command")
 
