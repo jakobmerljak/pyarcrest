@@ -248,7 +248,7 @@ class ARCRest:
         respstr = resp.read().decode()
 
         if token:
-            if resp.status != 200:
+            if resp.status != 201:
                 raise ARCHTTPError(resp.status, respstr)
             respstr = None
         else:
