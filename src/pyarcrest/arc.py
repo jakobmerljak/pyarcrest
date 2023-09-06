@@ -454,7 +454,7 @@ class ARCRest:
                 self.deleteDelegation(delegationID)
                 raise
 
-    def submitJobs(self, descs, queue, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
+    def submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
         raise Exception("Not implemented in the base class")
 
     def matchJob(self, ceInfo, queue=None, runtimes=[], walltime=None):
@@ -795,7 +795,7 @@ class ARCRest:
             return jsonData["job"]
 
     # TODO: think about what to log and how
-    def _submitJobs(self, descs, queue, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None, v1_0=False):
+    def _submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None, v1_0=False):
         import arc
         ceInfo = self.getCEInfo()
 
@@ -826,9 +826,9 @@ class ARCRest:
             jobqueue = arcdesc.Resources.QueueName
             if not jobqueue:
                 jobqueue = queue
-                if v1_0:
+                if jobqueue and v1_0:
                     # set queue in job description
-                    arcdesc.Resources.QueueName = queue
+                    arcdesc.Resources.QueueName = jobqueue
             runtimes = [str(env) for env in arcdesc.Resources.RunTimeEnvironment.getSoftwareList()]
             if not runtimes:
                 runtimes = []
@@ -1146,7 +1146,7 @@ class ARCRest_1_0(ARCRest):
                 results.append((response["id"], response["state"]))
         return results
 
-    def submitJobs(self, descs, queue, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
+    def submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
         return self._submitJobs(descs, queue, delegationID, processDescs, matchDescs, uploadData, workers, sendsize, timeout, v1_0=True)
 
     def getDelegationsList(self, type=None):
@@ -1187,7 +1187,7 @@ class ARCRest_1_1(ARCRest):
                 results.append((response["id"], response["state"]))
         return results
 
-    def submitJobs(self, descs, queue, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
+    def submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
         return self._submitJobs(descs, queue, delegationID, processDescs, matchDescs, uploadData, workers, sendsize, timeout)
 
 
