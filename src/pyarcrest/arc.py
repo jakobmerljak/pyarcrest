@@ -826,9 +826,9 @@ class ARCRest:
             jobqueue = arcdesc.Resources.QueueName
             if not jobqueue:
                 jobqueue = queue
-                if v1_0:
+                if jobqueue and v1_0:
                     # set queue in job description
-                    arcdesc.Resources.QueueName = queue
+                    arcdesc.Resources.QueueName = jobqueue
             runtimes = [str(env) for env in arcdesc.Resources.RunTimeEnvironment.getSoftwareList()]
             if not runtimes:
                 runtimes = []
