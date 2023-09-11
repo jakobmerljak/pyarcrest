@@ -122,62 +122,29 @@ def main():
     arcrest = ARCRest.getClient(url=args.cluster, proxypath=args.proxy, **kwargs)
 
     if args.command == "jobs" and args.jobs == "list":
-        status, text = arcrest._requestJSON("GET", "/jobs")
-        if status != 200:
-            print(f"ARC jobs list error: {status} {text}")
-        else:
-            try:
-                print(json.dumps(json.loads(text), indent=4))
-            except json.JSONDecodeError as exc:
-                if exc.doc == "":
-                    print([])
-                else:
-                    raise
+        print(json.dumps(arcrest.getJobsList(), indent=4))
 
     elif args.command == "jobs" and args.jobs in ("info", "clean"):
         tomanage = [{"id": arcid} for arcid in args.jobids]
-        if not tomanage:
-            return
-
-        jsonData = {}
-        if len(tomanage) == 1:
-            jsonData["job"] = tomanage[0]
-        else:
-            jsonData["job"] = tomanage
-
-        status, text = arcrest._requestJSON(
-            "POST",
-            f"/jobs?action={args.jobs}",
-            data=json.dumps(jsonData).encode(),
-            headers={"Content-type": "application/json"},
-        )
-        if status != 201:
-            print(f"ARC jobs operation error: {status} {text}")
-        else:
-            print(json.dumps(json.loads(text), indent=4))
+        if args.jobs == "info":
+            results = arcrest.getJobsInfo(tomanage)
+        elif args.jobs == "clean":
+            results = arcrest.cleanJobs(tomanage)
+        print(json.dumps(results, indent=4))
 
     elif args.command == "jobs" and args.jobs == "submit":
-        jobs = []
+        descs = []
         for desc in args.jobdescs:
             with desc.open() as f:
-                jobs.append(ARCJob(descstr=f.read()))
-        arcrest.submitJobs(args.queue, jobs)
-        for job in jobs:
-            print(job.id)
+                descs.append(f.read())
+        results = arcrest.submitJobs(descs, args.queue)
+        print(json.dumps(results, indent=4))
 
     elif args.command == "version":
-        status, text = arcrest._requestJSON("GET", "/rest")
-        if status != 200:
-            print(f"ARC CE REST API versions error: {status} {text}")
-        else:
-            print(json.dumps(json.loads(text), indent=4))
+        print(json.dumps(arcrest.getAPIVersions(), indent=4))
 
     elif args.command == "info":
-        status, text = arcrest._requestJSON("GET", "/info")
-        if status != 200:
-            print(f"ARC CE info error: {status} {text}")
-        else:
-            print(json.dumps(json.loads(text), indent=4))
+        print(json.dumps(arcrest.getCEInfo(), indent=4))
 
     elif args.command == "delegations" and args.delegations == "list":
         print(arcrest.getDelegationsList())
