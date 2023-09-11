@@ -805,7 +805,7 @@ class ARCRest:
         for i in range(len(descs)):
             # parse job description
             if not arc.JobDescription_Parse(descs[i], jobdescs):
-                resultDict[i] = [DescriptionParseError("Failed to parse description")]
+                resultDict[i] = DescriptionParseError("Failed to parse description")
                 continue
             arcdesc = jobdescs[-1]
 
@@ -828,7 +828,7 @@ class ARCRest:
                 try:
                     self.matchJob(ceInfo, jobqueue, runtimes, walltime)
                 except MatchmakingError as error:
-                    resultDict[i] = [error]
+                    resultDict[i] = error
                     continue
 
             if v1_0:
@@ -846,7 +846,7 @@ class ARCRest:
             # is not accepted by ARC CE, add to bulk description
             unparseResult = arcdesc.UnParse("emies:adl")
             if not unparseResult[0]:
-                resultDict[i] = [DescriptionUnparseError("Could not unparse processed description")]
+                resultDict[i] = DescriptionUnparseError("Could not unparse processed description")
                 continue
             descstart = unparseResult[1].find("<ActivityDescription")
             bulkdesc += unparseResult[1][descstart:]
@@ -870,7 +870,7 @@ class ARCRest:
 
         for (jobix, inputFiles), result in zip(tosubmit, results):
             if isinstance(result, ARCHTTPError):
-                resultDict[jobix] = [result]
+                resultDict[jobix] = result
             else:
                 jobid, state = result
                 resultDict[jobix] = (jobid, state)
@@ -884,7 +884,7 @@ class ARCRest:
             for jobix, uploadErrors in zip(uploadIXs, errors):
                 if uploadErrors:
                     jobid, state = resultDict[jobix]
-                    resultDict[jobix] = [InputUploadError(jobid, state, uploadErrors)]
+                    resultDict[jobix] = InputUploadError(jobid, state, uploadErrors)
 
         return [resultDict[i] for i in range(len(descs))]
 
