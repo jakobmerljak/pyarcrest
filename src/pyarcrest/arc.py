@@ -458,28 +458,15 @@ class ARCRest:
         raise Exception("Not implemented in the base class")
 
     def matchJob(self, ceInfo, queue=None, runtimes=[], walltime=None):
-        errors = []
-
         if queue:
-            try:
-                self._matchQueue(ceInfo, queue)
-            except MatchmakingError as exc:
-                errors.append(exc)
+            self._matchQueue(ceInfo, queue)
 
             # matching walltime requires queue
             if walltime:
-                try:
-                    self._matchWalltime(ceInfo, queue, walltime)
-                except MatchmakingError as exc:
-                    errors.append(exc)
+                self._matchWalltime(ceInfo, queue, walltime)
 
         for runtime in runtimes:
-            try:
-                self._matchRuntime(ceInfo, runtime)
-            except MatchmakingError as exc:
-                errors.append(exc)
-
-        return errors
+            self._matchRuntime(ceInfo, runtime)
 
     ### auth API ###
 
@@ -838,9 +825,10 @@ class ARCRest:
 
             # do matchmaking
             if matchDescs:
-                errors = self.matchJob(ceInfo, jobqueue, runtimes, walltime)
-                if errors:
-                    resultDict[i] = errors
+                try:
+                    self.matchJob(ceInfo, jobqueue, runtimes, walltime)
+                except MatchmakingError as error:
+                    resultDict[i] = [error]
                     continue
 
             if v1_0:
