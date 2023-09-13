@@ -804,7 +804,7 @@ class ARCRest:
         bulkdesc = ""
         for i in range(len(descs)):
             # parse job description
-            if not arc.JobDescription_Parse(descs[i], jobdescs):
+            if not arc.JobDescription.Parse(descs[i], jobdescs):
                 resultDict[i] = DescriptionParseError("Failed to parse description")
                 continue
             arcdesc = jobdescs[-1]
