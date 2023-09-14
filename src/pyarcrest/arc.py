@@ -39,6 +39,14 @@ from pyarcrest.x509 import parsePEM, signRequest
 log = logging.getLogger(__name__)
 
 
+class Result:
+
+    def __init__(self, value, error=False):
+        assert isinstance(error, bool)
+        self.value = value
+        self.error = True if error else False
+
+
 class ARCRest:
 
     DIAGNOSE_FILES = [
@@ -111,11 +119,11 @@ class ARCRest:
         for job, response in zip(jobs, responses):
             code, reason = int(response["status-code"]), response["reason"]
             if code != 200:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             elif "info_document" not in response:
-                results.append(NoValueInARCResult(f"No info document in successful info response for job {job}"))
+                results.append(Result(NoValueInARCResult(f"No info document in successful info response for job {job}"), error=True))
             else:
-                results.append(self._parseJobInfo(response["info_document"]))
+                results.append(Result(self._parseJobInfo(response["info_document"])))
         return results
 
     def getJobsStatus(self, jobs):
@@ -124,11 +132,11 @@ class ARCRest:
         for job, response in zip(jobs, responses):
             code, reason = int(response["status-code"]), response["reason"]
             if code != 200:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             elif "state" not in response:
-                results.append(NoValueInARCResult("No state in successful status response"))
+                results.append(Result(NoValueInARCResult("No state in successful status response"), error=True))
             else:
-                results.append(response["state"])
+                results.append(Result(response["state"]))
         return results
 
     def killJobs(self, jobs):
@@ -137,9 +145,9 @@ class ARCRest:
         for job, response in zip(jobs, responses):
             code, reason = int(response["status-code"]), response["reason"]
             if code != 202:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             else:
-                results.append(True)
+                results.append(Result(True))
         return results
 
     def cleanJobs(self, jobs):
@@ -148,9 +156,9 @@ class ARCRest:
         for job, response in zip(jobs, responses):
             code, reason = int(response["status-code"]), response["reason"]
             if code != 202:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             else:
-                results.append(True)
+                results.append(Result(True))
         return results
 
     def restartJobs(self, jobs):
@@ -159,9 +167,9 @@ class ARCRest:
         for job, response in zip(jobs, responses):
             code, reason = int(response["status-code"]), response["reason"]
             if code != 202:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             else:
-                results.append(True)
+                results.append(Result(True))
         return results
 
     def getJobsDelegations(self, jobs):
@@ -170,15 +178,16 @@ class ARCRest:
         for job, response in zip(jobs, responses):
             code, reason = int(response["status-code"]), response["reason"]
             if code != 200:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             elif "delegation_id" not in response:
-                results.append(NoValueInARCResult("No delegation ID in successful response"))
+                results.append(Result(NoValueInARCResult("No delegation ID in successful response"), error=True))
             else:
                 # /rest/1.0 compatibility
                 if isinstance(response["delegation_id"], list):
-                    results.append(response["delegation_id"])
+                    delegations = response["delegation_id"]
                 else:
-                    results.append([response["delegation_id"]])
+                    delegations = [response["delegation_id"]]
+                results.append(Result(delegations))
         return results
 
     def downloadFile(self, jobid, sessionPath, filePath):
@@ -800,7 +809,7 @@ class ARCRest:
         for i in range(len(descs)):
             # parse job description
             if not arc.JobDescription.Parse(descs[i], jobdescs):
-                resultDict[i] = DescriptionParseError("Failed to parse description")
+                resultDict[i] = Result(DescriptionParseError("Failed to parse description"), error=True)
                 continue
             arcdesc = jobdescs[-1]
 
@@ -823,7 +832,7 @@ class ARCRest:
                 try:
                     self.matchJob(ceInfo, jobqueue, runtimes, walltime)
                 except MatchmakingError as error:
-                    resultDict[i] = error
+                    resultDict[i] = Result(error, error=True)
                     continue
 
             if v1_0:
@@ -841,7 +850,7 @@ class ARCRest:
             # is not accepted by ARC CE, add to bulk description
             unparseResult = arcdesc.UnParse("emies:adl")
             if not unparseResult[0]:
-                resultDict[i] = DescriptionUnparseError("Could not unparse processed description")
+                resultDict[i] = Result(DescriptionUnparseError("Could not unparse processed description"), error=True)
                 continue
             descstart = unparseResult[1].find("<ActivityDescription")
             bulkdesc += unparseResult[1][descstart:]
@@ -864,11 +873,11 @@ class ARCRest:
         uploadInputs = []  # a list of job input file dicts for upload
 
         for (jobix, inputFiles), result in zip(tosubmit, results):
-            if isinstance(result, ARCHTTPError):
-                resultDict[jobix] = result
+            if result.error:
+                resultDict[jobix] = Result(result.value, error=True)
             else:
-                jobid, state = result
-                resultDict[jobix] = (jobid, state)
+                jobid, state = result.value
+                resultDict[jobix] = Result((jobid, state))
                 uploadIDs.append(jobid)
                 uploadInputs.append(inputFiles)
                 uploadIXs.append(jobix)
@@ -878,8 +887,8 @@ class ARCRest:
             errors = self.uploadJobFiles(uploadIDs, uploadInputs, workers, sendsize, timeout or self.timeout)
             for jobix, uploadErrors in zip(uploadIXs, errors):
                 if uploadErrors:
-                    jobid, state = resultDict[jobix]
-                    resultDict[jobix] = InputUploadError(jobid, state, uploadErrors)
+                    jobid, state = resultDict[jobix].value
+                    resultDict[jobix] = Result(InputUploadError(jobid, state, uploadErrors), error=True)
 
         return [resultDict[i] for i in range(len(descs))]
 
@@ -1121,9 +1130,9 @@ class ARCRest_1_0(ARCRest):
         for response in responses:
             code, reason = int(response["status-code"]), response["reason"]
             if code != 201:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             else:
-                results.append((response["id"], response["state"]))
+                results.append(Result((response["id"], response["state"])))
         return results
 
     def submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
@@ -1162,9 +1171,9 @@ class ARCRest_1_1(ARCRest):
         for response in responses:
             code, reason = int(response["status-code"]), response["reason"]
             if code != 201:
-                results.append(ARCHTTPError(code, reason))
+                results.append(Result(ARCHTTPError(code, reason), error=True))
             else:
-                results.append((response["id"], response["state"]))
+                results.append(Result((response["id"], response["state"])))
         return results
 
     def submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
