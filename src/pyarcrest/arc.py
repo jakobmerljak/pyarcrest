@@ -103,7 +103,7 @@ class ARCRest:
         return [job["id"] for job in jsonData]
 
     def createJobs(self, description, queue=None, delegationID=None, isADL=True):
-        raise Exception("Not implemented in the base class")
+        raise NotImplementedError
 
     def getJobsInfo(self, jobs):
         responses = self._manageJobs(jobs, "info")
@@ -455,7 +455,7 @@ class ARCRest:
                 raise
 
     def submitJobs(self, descs, queue=None, delegationID=None, processDescs=True, matchDescs=True, uploadData=True, workers=None, sendsize=None, timeout=None):
-        raise Exception("Not implemented in the base class")
+        raise NotImplementedError
 
     def matchJob(self, ceInfo, queue=None, runtimes=[], walltime=None):
         if queue:
