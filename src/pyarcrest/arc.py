@@ -974,11 +974,9 @@ class ARCRest:
 
             # every possible exception needs to be handled, otherwise the
             # threads will lock up
-            except:
-                import traceback
-                excstr = traceback.format_exc()
-                errorQueue.put({"jobid": jobid, "error": Exception(excstr)})
-                log.debug(f"Download name {name} and path {path} for job {jobid} failed: {excstr}")
+            except BaseException as exc:
+                errorQueue.put({"jobid": jobid, "error": exc})
+                log.debug(f"Download name {name} and path {path} for job {jobid} failed: {exc}")
 
     @classmethod
     def _getArclibInputFiles(cls, desc):
