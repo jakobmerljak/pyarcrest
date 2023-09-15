@@ -14,9 +14,9 @@ def main():
     parserCommon = argparse.ArgumentParser(add_help=False)
     parserCommon.add_argument("-P", "--proxy", type=str, default=PROXYPATH, help="path to proxy cert")
     parserCommon.add_argument("-v", "--verbose", action="store_true", help="print debug output")
+    parserCommon.add_argument("cluster", type=str, help="hostname (with optional port) of the cluster")
 
-    parser = argparse.ArgumentParser("Execute ARC operations", parents=[parserCommon])
-    parser.add_argument("cluster", type=str, help="hostname (with optional port) of the cluster")
+    parser = argparse.ArgumentParser("Execute ARC operations")
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser(
@@ -34,7 +34,6 @@ def main():
     jobs_parser = subparsers.add_parser(
         "jobs",
         help="execute operations on /jobs endpoint",
-        parents=[parserCommon],
     )
 
     jobs_subparsers = jobs_parser.add_subparsers(dest="jobs")
@@ -91,7 +90,6 @@ def main():
     delegs_parser = subparsers.add_parser(
         "delegations",
         help="execute operations on /delegations endpoint",
-        parents=[parserCommon],
     )
 
     delegs_subparsers = delegs_parser.add_subparsers(dest="delegations")
@@ -130,6 +128,16 @@ def main():
     delegs_delete_parser.add_argument("delegid", type=str, help="delegation ID to delete")
 
     args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return
+    if args.command == "jobs" and not args.jobs:
+        jobs_parser.print_help()
+        return
+    elif args.command == "delegations" and not args.delegations:
+        delegs_parser.print_help()
+        return
 
     kwargs = {}
     if args.verbose:
