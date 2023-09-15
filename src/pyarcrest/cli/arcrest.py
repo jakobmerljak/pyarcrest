@@ -5,7 +5,7 @@ import os
 import pathlib
 import sys
 
-from pyarcrest.arc import ARCJob, ARCRest
+from pyarcrest.arc import ARCRest
 
 PROXYPATH = f"/tmp/x509up_u{os.getuid()}"
 
@@ -50,7 +50,21 @@ def main():
         help="get info for given jobs",
         parents=[parserCommon],
     )
-    jobs_info_parser.add_argument("jobids", type=str, nargs='+', help="job IDs to fetch")
+    jobs_info_parser.add_argument("jobids", type=str, nargs='+', help="job IDs to fetch info for")
+
+    jobs_status_parser = jobs_subparsers.add_parser(
+        "status",
+        help="get status for given jobs",
+        parents=[parserCommon],
+    )
+    jobs_status_parser.add_argument("jobids", type=str, nargs='+', help="job IDs to fetch status for")
+
+    jobs_kill_parser = jobs_subparsers.add_parser(
+        "kill",
+        help="kill given jobs",
+        parents=[parserCommon],
+    )
+    jobs_kill_parser.add_argument("jobids", type=str, nargs='+', help="job IDs to kill")
 
     jobs_clean_parser = jobs_subparsers.add_parser(
         "clean",
@@ -58,6 +72,13 @@ def main():
         parents=[parserCommon],
     )
     jobs_clean_parser.add_argument("jobids", type=str, nargs='+', help="job IDs to clean")
+
+    jobs_restart_parser = jobs_subparsers.add_parser(
+        "restart",
+        help="restart given jobs",
+        parents=[parserCommon],
+    )
+    jobs_restart_parser.add_argument("jobids", type=str, nargs='+', help="job IDs to restart")
 
     jobs_submit_parser = jobs_subparsers.add_parser(
         "submit",
@@ -124,13 +145,19 @@ def main():
     if args.command == "jobs" and args.jobs == "list":
         print(json.dumps(arcrest.getJobsList(), indent=4))
 
-    elif args.command == "jobs" and args.jobs in ("info", "clean"):
-        tomanage = [{"id": arcid} for arcid in args.jobids]
+    elif args.command == "jobs" and args.jobs in ("info", "status", "kill", "clean", "restart"):
         if args.jobs == "info":
-            results = arcrest.getJobsInfo(tomanage)
+            results = arcrest.getJobsInfo(args.jobids)
+        elif args.jobs == "status":
+            results = arcrest.getJobsStatus(args.jobids)
+        elif args.jobs == "kill":
+            results = arcrest.killJobs(args.jobids)
         elif args.jobs == "clean":
-            results = arcrest.cleanJobs(tomanage)
-        print(json.dumps(results, indent=4))
+            results = arcrest.cleanJobs(args.jobids)
+        elif args.jobs == "restart":
+            results = arcrest.restartJobs(args.jobids)
+        # default is required to be able to serialize datetime objects
+        print(json.dumps(results, indent=4, default=str))
 
     elif args.command == "jobs" and args.jobs == "submit":
         descs = []
