@@ -19,13 +19,13 @@ def main():
     parser.add_argument("cluster", type=str, help="hostname (with optional port) of the cluster")
     subparsers = parser.add_subparsers(dest="command")
 
-    version_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "version",
         help="get supported REST API versions",
         parents=[parserCommon],
     )
 
-    info_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "info",
         help="get CE resource information",
         parents=[parserCommon],
@@ -39,7 +39,7 @@ def main():
 
     jobs_subparsers = jobs_parser.add_subparsers(dest="jobs")
 
-    jobs_list_parser = jobs_subparsers.add_parser(
+    jobs_subparsers.add_parser(
         "list",
         help="get list of jobs",
         parents=[parserCommon],
@@ -75,13 +75,13 @@ def main():
 
     delegs_subparsers = delegs_parser.add_subparsers(dest="delegations")
 
-    delegs_list_parser = delegs_subparsers.add_parser(
+    delegs_subparsers.add_parser(
         "list",
         help="list user's delegations",
         parents=[parserCommon],
     )
 
-    delegs_new_parser = delegs_subparsers.add_parser(
+    delegs_subparsers.add_parser(
         "new",
         help="create new delegation",
         parents=[parserCommon],
