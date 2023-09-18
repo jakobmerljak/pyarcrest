@@ -20,6 +20,7 @@ import datetime
 import json
 import os
 import queue
+import re
 import threading
 from urllib.parse import urlparse
 
@@ -407,6 +408,8 @@ class ARCRest:
 
         self.log.debug(f"Created {len(restClients)} download workers")
 
+        refilters = {jobid: re.compile(refilter) for jobid, refilter in outputFilters.items()}
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
             futures = []
             for restClient in restClients:
@@ -416,7 +419,7 @@ class ARCRest:
                     transferQueue,
                     errorQueue,
                     downloadDir,
-                    outputFilters,
+                    refilters,
                     self.log,
                 ))
             concurrent.futures.wait(futures)
@@ -696,7 +699,7 @@ class ARCRest:
 
     # When name is "", it means the root of the session dir. In this case,
     # slash must not be added to it.
-    def _addTransfersFromListing(self, transferQueue, jobid, filters, listing, name, path, cancelEvent):
+    def _addTransfersFromListing(self, transferQueue, jobid, listing, name, path, cancelEvent, refilter=None):
         files = listing.get("file", [])
         # /rest/1.0 compatibility
         if not isinstance(files, list):
@@ -707,7 +710,7 @@ class ARCRest:
                 newname = f"{name}/{f}"
             else:
                 newname = f
-            if not self._filterOutFile(filters, newname):
+            if not refilter or refilter.match(newname):
                 transferQueue.put(Transfer(jobid, newname, newpath, type="file", cancelEvent=cancelEvent))
 
         dirs = listing.get("dirs", [])
@@ -720,35 +723,8 @@ class ARCRest:
                 newname = f"{name}/{d}"
             else:
                 newname = d
-            if not self._filterOutListing(filters, newname):
+            if not refilter or refilter.match(newname):
                 transferQueue.put(Transfer(jobid, newname, newpath, type="listing", cancelEvent=cancelEvent))
-
-    def _filterOutFile(self, filters, name):
-        if not filters:
-            return False
-        for pattern in filters:
-            # direct match
-            if pattern == name:
-                return False
-            # recursive folder match
-            elif pattern.endswith("/") and name.startswith(pattern):
-                return False
-            # entire session directory, not matched by above if
-            elif pattern == "/":
-                return False
-        return True
-
-    def _filterOutListing(self, filters, name):
-        if not filters:
-            return False
-        for pattern in filters:
-            # direct match
-            if pattern == name or pattern == f"{name}/":
-                return False
-            # recursive folder match
-            elif pattern.endswith("/") and name.startswith(pattern):
-                return False
-        return True
 
     def _requestJSON(self, method, endpoint, headers={}, token=None, jsonData=None, data=None, params={}):
         headers["Accept"] = "application/json"
@@ -966,10 +942,10 @@ class ARCRest:
                         errorQueue.put({"jobid": jobid, "error": exc})
                         log.error(f"Download listing {name} for job {jobid} failed: {exc}")
                     else:
-                        filters = outputFilters.get(jobid, [])
+                        refilter = outputFilters.get(jobid, None)
                         # create new transfer jobs
                         restClient._addTransfersFromListing(
-                            transferQueue, jobid, filters, listing, name, path, transfer.cancelEvent,
+                            transferQueue, jobid, listing, name, path, transfer.cancelEvent, refilter=refilter,
                         )
 
             # every possible exception needs to be handled, otherwise the
