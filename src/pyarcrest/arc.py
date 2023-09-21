@@ -53,14 +53,13 @@ class ARCRest:
         additional implementations of attributes and methods are required from
         derived classes.
         """
+        assert token or proxypath
         if token:
             self.token = token
             self.proxypath = None
         elif proxypath:
             self.token = None
             self.proxypath = proxypath
-        else:
-            raise ARCError("One of either token or proxy is required for authentication")
         self.httpClient = httpClient
         self.apiBase = apiBase
         self.log = log
@@ -215,11 +214,11 @@ class ARCRest:
 
     def getDelegationsList(self, type=None):
         params = {}
+
         if type:
-            if type not in ("x509", "jwt"):
-                raise ARCError(f"Invalid type parameter: {type}")
-            else:
-                params["type"] = type
+            assert type in ("x509", "jwt")
+            params["type"] = type
+
         status, text = self._requestJSON("GET", "/delegations", params=params)
         if status != 200:
             raise ARCHTTPError(status, text)
@@ -517,12 +516,11 @@ class ARCRest:
 
     @classmethod
     def getHTTPClient(cls, url=None, host=None, port=None, blocksize=None, timeout=None, log=getNullLogger(), token=None, proxypath=None):
+        assert token or proxypath
         if token:
             return HTTPClient(url, host, port, blocksize, timeout, log=log)
         elif proxypath:
             return HTTPClient(url, host, port, blocksize, timeout, proxypath, log)
-        else:
-            raise ARCError("One of either token or proxy path is required for authentication")
 
     # TODO: explain the rationale in documentation about the design of the API
     #       version selection mechanism:
@@ -686,8 +684,7 @@ class ARCRest:
         diagnoseDir = diagnoseDirs.get(jobid, "gmlog")
         transfers = []
         for diagFile in diagnoseList:
-            if diagFile not in self.DIAGNOSE_FILES:
-                raise ARCError(f"Invalid diagnose file name {diagFile}")
+            assert diagFile in self.DIAGNOSE_FILES
             path = os.path.join(downloadDir, jobid, diagnoseDir, diagFile)
             transfers.append(Transfer(jobid, diagFile, path, type="diagnose", cancelEvent=cancelEvent))
         # no exception raised, add transfers to queue
@@ -1098,8 +1095,7 @@ class ARCRest:
 class ARCRest_1_0(ARCRest):
 
     def __init__(self, httpClient, token=None, proxypath=None, apiBase="/arex", log=getNullLogger(), sendsize=None, recvsize=None, timeout=None):
-        if token:
-            raise ARCError("Token credentials not supported for API version 1.0")
+        assert not token
         super().__init__(httpClient, None, proxypath, apiBase, log, sendsize, recvsize, timeout)
         self.version = "1.0"
         self.apiPath = f"{self.apiBase}/rest/{self.version}"
