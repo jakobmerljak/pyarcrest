@@ -25,17 +25,13 @@ import re
 import threading
 from urllib.parse import urlparse
 
-from cryptography import x509
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-
 from pyarcrest.errors import (ARCError, ARCHTTPError, DescriptionParseError,
                               DescriptionUnparseError, InputFileError,
                               InputUploadError, MatchmakingError,
                               MissingDiagnoseFile, MissingOutputFile,
                               NoValueInARCResult)
 from pyarcrest.http import HTTPClient
-from pyarcrest.x509 import parsePEM, signRequest
+from pyarcrest.x509 import certToPEM, parseProxyPEM, pemToCSR, signProxyCSR
 
 log = logging.getLogger(__name__)
 
@@ -662,15 +658,14 @@ class ARCRest:
                 runtimes.append(envname)
         return runtimes
 
-    def _signCSR(self, csrStr, lifetime=None):
+    def _signCSR(self, csrPEM, lifetime=None):
         with open(self.proxypath) as f:
-            proxyStr = f.read()
-        proxyCert, _, issuerChains = parsePEM(proxyStr)
-        chain = proxyCert.public_bytes(serialization.Encoding.PEM).decode() + issuerChains + '\n'
-        csr = x509.load_pem_x509_csr(csrStr.encode(), default_backend())
-        cert = signRequest(csr, self.proxypath, lifetime=lifetime).decode()
-        pem = (cert + chain).encode()
-        return pem
+            proxyPEM = f.read()
+        certPEM, _, chainPEM = parseProxyPEM(proxyPEM)
+        chainPEM = certPEM + chainPEM
+        csr = pemToCSR(csrPEM)
+        cert = signProxyCSR(csr, self.proxypath, lifetime=lifetime)
+        return certToPEM(cert) + chainPEM
 
     def _addInputTransfers(self, uploadQueue, jobid, inputFiles):
         cancelEvent = threading.Event()

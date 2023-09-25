@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from pyarcrest.errors import X509Error
 
@@ -13,13 +14,23 @@ PROXYPATH = f"/tmp/x509up_u{os.getuid()}"
 
 
 def isOldProxy(cert):
-    r"""Check if last CN is "proxy" or "limited proxy"."""
+    """
+    Return True if the given proxy Certificate object is in old format.
+
+    The value of the last CN of an old format proxy is either "proxy" or
+    "limited proxy".
+    """
     lastCN = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[-1]
     return lastCN.value in ("proxy", "limited proxy")
 
 
 def validKeyUsage(cert):
-    """Check if digital signature bit is set in keyUsage extension."""
+    """
+    Return True if the given proxy Certificate object's key usage is valid.
+
+    Key usage is considered valid if digital signature bit is set in extension
+    or if there is no key usage extension.
+    """
     try:
         keyUsage = cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.KEY_USAGE)
         return bool(keyUsage.value.digital_signature)
@@ -27,18 +38,38 @@ def validKeyUsage(cert):
         return True
 
 
-def createProxyCSR(issuerCert, proxyKey):
-    """Create proxy certificate signing request."""
+def checkRFCProxy(proxy):
+    """Return True if the given Certificate object is a valid X.509 RFC 3820 proxy."""
+    for ext in proxy.extensions:
+        if ext.oid.dotted_string == "1.3.6.1.5.5.7.1.14":
+            return True
+    return False
 
-    if isOldProxy(issuerCert):
+
+def createProxyCSR(issuer, key):
+    """
+    Create proxy certificate signing request.
+
+    Args:
+        issuer:
+            A proxy Certificate object of the proxied entity.
+        key:
+            A key object of the proxying entity.
+            The type of object is one of RSAPrivateKey, DSAPrivateKey,
+            EllipticCurvePrivateKey, Ed25519PrivateKey or Ed448PrivateKey.
+
+    Returns:
+        A CertificateSigningRequest object.
+    """
+    if isOldProxy(issuer):
         raise X509Error("Proxy format not supported")
-    if not validKeyUsage(issuerCert):
+    if not validKeyUsage(issuer):
         raise X509Error("Proxy uses invalid keyUsage extension")
 
     builder = x509.CertificateSigningRequestBuilder()
 
     # copy subject to CSR
-    subject = list(issuerCert.subject)
+    subject = list(issuer.subject)
     builder = builder.subject_name(x509.Name(subject))
 
     # add proxyCertInfo extension
@@ -47,26 +78,31 @@ def createProxyCSR(issuerCert, proxyKey):
     extension = x509.extensions.UnrecognizedExtension(oid, value)
     builder = builder.add_extension(extension, critical=True)
 
-    # sign the proxy CSR with the issuer's private key
-    csr = builder.sign(
-        private_key=proxyKey,
+    # sign the proxy CSR with the key
+    return builder.sign(
+        private_key=key,
         algorithm=hashes.SHA256(),
         backend=default_backend(),
     )
 
-    return csr
 
+def signProxyCSR(csr, proxypath=PROXYPATH, lifetime=None):
+    """
+    Sign proxy CSR.
 
-def checkRFCProxy(proxy):
-    """Check if valid X509 RFC 3820 proxy."""
-    for ext in proxy.extensions:
-        if ext.oid.dotted_string == "1.3.6.1.5.5.7.1.14":
-            return True
-    return False
+    Args:
+        csr:
+            A CertificateSigningRequest object.
+        proxypath:
+            A string of the path of the proxy file.
+        lifetime:
+            If None, the cert validity will be the same as that of the signing
+            cert. Otherwise, it is used as a number of hours from now which the
+            cert will be valid for.
 
-
-def signRequest(csr, proxypath=PROXYPATH, lifetime=None):
-    """Sign proxy CSR."""
+    Returns:
+        A proxy Certificate object.
+    """
     now = datetime.utcnow()
     if not csr.is_signature_valid:
         raise X509Error("Invalid request signature")
@@ -81,6 +117,7 @@ def signRequest(csr, proxypath=PROXYPATH, lifetime=None):
     key = serialization.load_pem_private_key(proxy_pem, password=None, backend=default_backend())
     keyID = x509.SubjectKeyIdentifier.from_public_key(key.public_key())
 
+    # add a CN with serial number to subject
     subject = list(proxy.subject)
     subject.append(x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, str(int(time.time()))))
 
@@ -117,16 +154,15 @@ def signRequest(csr, proxypath=PROXYPATH, lifetime=None):
         cert_builder = cert_builder.not_valid_after(proxy.not_valid_after)
     else:
         cert_builder = cert_builder.not_valid_after(now + timedelta(hours=lifetime))
-    new_cert = cert_builder.sign(
+    return cert_builder.sign(
         private_key=key,
         algorithm=proxy.signature_hash_algorithm,
         backend=default_backend()
     )
-    return new_cert.public_bytes(serialization.Encoding.PEM)
 
 
-def parsePEM(pem):
-    """Return a tuple of loaded cert, key and chain string from PEM."""
+def parseProxyPEM(pem):
+    """Return cert, key and chain PEMs from the given proxy PEM."""
     sections = re.findall(
         "-----BEGIN.*?-----.*?-----END.*?-----",
         pem,
@@ -139,25 +175,41 @@ def parsePEM(pem):
         chainPEMs = sections[2:]
     except IndexError:
         raise X509Error("Invalid PEM")
+    else:
+        return f"{certPEM}\n", f"{keyPEM}\n", "\n".join(chainPEMs) + "\n"
 
-    try:
-        cert = x509.load_pem_x509_certificate(
-            certPEM.encode(),
-            default_backend()
-        )
-        key = serialization.load_pem_private_key(
-            keyPEM.encode(),
-            password=None,
-            backend=default_backend()
-        )
-        for chainPEM in chainPEMs:
-            x509.load_pem_x509_certificate(
-                chainPEM.encode(),
-                default_backend()
-            )
-        chain = "\n".join(chainPEMs)
-    except ValueError:
-        raise X509Error("Cannot decode PEM")
 
-    # return loaded cryptography objects and the issuer chain
-    return cert, key, chain
+def generateKey(size=2048):
+    return rsa.generate_private_key(
+        public_exponent=65537,  # the docs say that this value should be used
+        key_size=size,
+        backend=default_backend()
+    )
+
+
+def certToPEM(cert):
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def pemToCert(pem):
+    return x509.load_pem_x509_certificate(pem.encode(), default_backend())
+
+
+def csrToPEM(csr):
+    return certToPEM(csr)
+
+
+def pemToCSR(pem):
+    return x509.load_pem_x509_csr(pem.encode(), default_backend())
+
+
+def keyToPEM(key):
+    return key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    ).decode()
+
+
+def pemToKey(pem):
+    return serialization.load_pem_private_key(pem.encode(), password=None)
