@@ -205,13 +205,27 @@ class ARCRest:
             raise ARCHTTPError(status, text)
 
         # /rest/1.0 compatibility
+        # handle empty response
+        listing = {}
         try:
-            return json.loads(text)
+            listing = json.loads(text)
         except json.JSONDecodeError as exc:
-            if exc.doc == "":
-                return {}
-            else:
+            if exc.doc != "":
                 raise
+        # handle inexisting file list ...
+        if "file" not in listing:
+            listing["file"] = []
+        # ... or a single file string
+        elif not isinstance(listing["file"], list):
+            listing["file"] = [listing["file"]]
+        # handle inexsisting dir list ...
+        if "dirs" not in listing:
+            listing["dirs"] = []
+        # ... or a single dir string
+        elif not isinstance(listing["dirs"], list):
+            listing["dirs"] = [listing["dirs"]]
+
+        return listing
 
     def downloadDiagnoseFile(self, jobid, name, path):
         if name not in self.DIAGNOSE_FILES:
@@ -699,11 +713,7 @@ class ARCRest:
     # When name is "", it means the root of the session dir. In this case,
     # slash must not be added to it.
     def _addTransfersFromListing(self, transferQueue, jobid, listing, name, path, cancelEvent, refilter=None):
-        files = listing.get("file", [])
-        # /rest/1.0 compatibility
-        if not isinstance(files, list):
-            files = [files]
-        for f in files:
+        for f in listing["file"]:
             newpath = os.path.join(path, f)
             if name:
                 newname = f"{name}/{f}"
@@ -712,11 +722,7 @@ class ARCRest:
             if not refilter or refilter.match(newname):
                 transferQueue.put(Transfer(jobid, newname, newpath, type="file", cancelEvent=cancelEvent))
 
-        dirs = listing.get("dirs", [])
-        # /rest/1.0 compatibility
-        if not isinstance(dirs, list):
-            dirs = [dirs]
-        for d in dirs:
+        for d in listing["dirs"]:
             newpath = os.path.join(path, d)
             if name:
                 newname = f"{name}/{d}"
