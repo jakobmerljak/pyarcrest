@@ -188,7 +188,13 @@ class ARCRest:
         return results
 
     def downloadFile(self, jobid, sessionPath, filePath):
-        self._downloadURL(f"/jobs/{jobid}/session/{sessionPath}", filePath)
+        try:
+            self._downloadURL(f"/jobs/{jobid}/session/{sessionPath}", filePath)
+        except ARCHTTPError as exc:
+            if exc.status == 404:
+                raise MissingOutputFile(sessionPath)
+            else:
+                raise
 
     def uploadFile(self, jobid, sessionPath, filePath):
         urlPath = f"/jobs/{jobid}/session/{sessionPath}"
