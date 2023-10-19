@@ -941,15 +941,8 @@ class ARCRest:
                         elif transfer.type == "diagnose":
                             restClient.downloadDiagnoseFile(jobid, name, path)
                     except Exception as exc:
-                        error = exc
-                        if isinstance(exc, ARCHTTPError):
-                            if exc.status == 404:
-                                if transfer.type == "file":
-                                    error = MissingOutputFile(name)
-                                elif transfer.type == "diagnose":
-                                    error = MissingDiagnoseFile(name)
-                        errorQueue.put({"jobid": jobid, "error": error})
-                        log.error(f"Download {transfer.type} {name} to {path} for job {jobid} failed: {error}")
+                        errorQueue.put({"jobid": jobid, "error": exc})
+                        log.error(f"Download {transfer.type} {name} to {path} for job {jobid} failed: {exc}")
 
                 elif transfer.type == "listing":
                     try:
