@@ -230,8 +230,7 @@ class ARCRest:
     def downloadDiagnoseFile(self, jobid, name, filePath):
         if name not in self.DIAGNOSE_FILES:
             raise ARCError(f"Invalid control dir file requested: {name}")
-        urlPath = f"/jobs/{jobid}/diagnose/{name}"
-        self._downloadURL(urlPath, filePath)
+        self._downloadURL(f"/jobs/{jobid}/diagnose/{name}", filePath)
 
     def getDelegationsList(self, type=None):
         params = {}
